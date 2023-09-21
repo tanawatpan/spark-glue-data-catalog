@@ -37,7 +37,24 @@ WORKDIR /src/aws-glue-data-catalog-client-for-apache-hive-metastore
 RUN mvn clean package -DskipTests
 
 # Final stage
-FROM spark:3.4.1-scala2.12-java11-ubuntu
+FROM apache/spark:3.4.1-scala2.12-java11-ubuntu
+
+ARG PYTHON_VERSION=3.11
+
+# Install Python
+USER root
+RUN apt update && apt upgrade -y \
+ && apt install software-properties-common -y \
+ && add-apt-repository ppa:deadsnakes/ppa \
+ && apt -y update \
+ && apt -y install -y curl python${PYTHON_VERSION} \
+ && curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYTHON_VERSION} \
+ && apt -y clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip${PYTHON_VERSION} install --upgrade pip \
+ && pip${PYTHON_VERSION} install findspark regex pyarrow numpy scipy nltk pandas scikit-learn transformers
 
 ARG HADOOP_VERSION=3.3.4
 
@@ -58,5 +75,7 @@ COPY --from=build /root/.m2/repository/org/apache/hive/hive-common/2.3.10-SNAPSH
 COPY --from=build /root/.m2/repository/org/apache/hive/hive-metastore/2.3.10-SNAPSHOT/hive-metastore-2.3.10-SNAPSHOT.jar ./
 COPY --from=build /src/aws-glue-data-catalog-client-for-apache-hive-metastore/aws-glue-datacatalog-spark-client/target/aws-glue-datacatalog-spark-client-3.4.0-SNAPSHOT.jar ./
 
+USER spark
 ENV PATH=$PATH:$SPARK_HOME/bin
+ENV PYSPARK_PYTHON=python${PYTHON_VERSION}
 WORKDIR $SPARK_HOME
