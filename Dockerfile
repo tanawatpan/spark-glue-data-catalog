@@ -1,4 +1,12 @@
+ARG SPARK_VERSION=3.4.1
+ARG PYTHON_VERSION=3.11
+ARG SCALA_VERSION=2.12
+ARG SPARK_PACKAGES="org.apache.spark:spark-hadoop-cloud_${SCALA_VERSION}:${SPARK_VERSION},io.delta:delta-core_${SCALA_VERSION}:2.4.0,org.apache.spark:spark-connect_${SCALA_VERSION}:${SPARK_VERSION}"
+ARG PYTHON_PACKAGES="findspark regex pyarrow numpy scipy pandas nltk scikit-learn transformers"
+
 FROM maven:3.6.3-openjdk-8 AS build
+ARG SPARK_VERSION
+ARG SCALA_VERSION
 
 # Install required packages
 RUN apt-get -y update \
@@ -7,22 +15,30 @@ RUN apt-get -y update \
 
 # Build patched Hive for Hive client
 WORKDIR /src
-RUN git clone https://github.com/apache/hive.git
+RUN git clone --branch branch-3.1 https://github.com/apache/hive.git
 
-# Install required packages
-WORKDIR /root/.m2/repository/org/pentaho/pentaho-aggdesigner-algorithm/5.1.5-jhyde/
-RUN wget https://repository.mapr.com/nexus/content/groups/mapr-public/conjars/org/pentaho/pentaho-aggdesigner-algorithm/5.1.5-jhyde/pentaho-aggdesigner-algorithm-5.1.5-jhyde.pom \
- && wget https://repository.mapr.com/nexus/content/groups/mapr-public/conjars/org/pentaho/pentaho-aggdesigner-algorithm/5.1.5-jhyde/pentaho-aggdesigner-algorithm-5.1.5-jhyde.jar
-
-WORKDIR /root/.m2/repository/org/pentaho/pentaho-aggdesigner/5.1.5-jhyde/
-RUN wget https://repository.mapr.com/nexus/content/groups/mapr-public/conjars/org/pentaho/pentaho-aggdesigner/5.1.5-jhyde/pentaho-aggdesigner-5.1.5-jhyde.pom
-
-# Build patched Hive and AWS Glue Hive-Spark client
+# Build patched Hive
 WORKDIR /src/hive
 RUN git checkout branch-3.1 \
  && wget https://raw.githubusercontent.com/awslabs/aws-glue-data-catalog-client-for-apache-hive-metastore/branch-3.4.0/branch_3.1.patch \
- && git apply -3 branch_3.1.patch \
- && mvn clean install -DskipTests
+ && git apply -3 branch_3.1.patch
+
+# Exclude pentaho-aggdesigner and pentaho-aggdesigner-algorithm
+RUN cat <<EOF > exclude.txt
+<exclusions>
+    <exclusion>
+        <groupId>org.pentaho</groupId>
+        <artifactId>pentaho-aggdesigner</artifactId>
+    </exclusion>
+    <exclusion>
+        <groupId>org.pentaho</groupId>
+        <artifactId>pentaho-aggdesigner-algorithm</artifactId>
+    </exclusion>
+</exclusions>
+EOF
+RUN sed -i "82 r exclude.txt" upgrade-acid/pom.xml
+
+RUN mvn clean install -DskipTests
 
 RUN git add . \
  && git reset --hard \
@@ -31,15 +47,17 @@ RUN git add . \
  && patch -p0 <HIVE-12679.branch-2.3.patch \
  && mvn clean install -DskipTests
 
+# Build AWS Glue Hive-Spark client
 WORKDIR /src
 RUN git clone --branch branch-3.4.0 https://github.com/awslabs/aws-glue-data-catalog-client-for-apache-hive-metastore.git
 WORKDIR /src/aws-glue-data-catalog-client-for-apache-hive-metastore
 RUN mvn clean package -DskipTests
 
-# Final stage
-FROM apache/spark:3.4.1-scala2.12-java11-ubuntu
-
-ARG PYTHON_VERSION=3.11
+# Build Spark
+FROM apache/spark:${SPARK_VERSION}-scala${SCALA_VERSION}-java11-ubuntu
+ARG SPARK_PACKAGES
+ARG PYTHON_VERSION
+ARG PYTHON_PACKAGES
 
 # Install Python
 USER root
@@ -54,28 +72,30 @@ RUN apt update && apt upgrade -y \
 
 # Install Python packages
 RUN pip${PYTHON_VERSION} install --upgrade pip \
- && pip${PYTHON_VERSION} install findspark regex pyarrow numpy scipy nltk pandas scikit-learn transformers
-
-ARG HADOOP_VERSION=3.3.4
+ && pip${PYTHON_VERSION} install $PYTHON_PACKAGES
 
 # Remove existing Hive jars
 RUN rm -f $SPARK_HOME/jars/hive-exec-* \
  && rm -f $SPARK_HOME/jars/hive-common-* \
  && rm -f $SPARK_HOME/jars/hive-metastore-*
 
-# Download required Hadoop and AWS SDK jars
-WORKDIR $SPARK_HOME/jars
-RUN wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_VERSION}/hadoop-aws-${HADOOP_VERSION}.jar \
- && wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.537/aws-java-sdk-bundle-1.12.537.jar \
- && wget https://repo1.maven.org/maven2/org/apache/spark/spark-hadoop-cloud_2.12/3.4.1/spark-hadoop-cloud_2.12-3.4.1.jar
+RUN mkdir -p /home/spark \
+ && chown -R spark:spark /home/spark
 
-# Copy patched Hive and Hive client jars
+USER spark
+WORKDIR $SPARK_HOME/jars
+# Copy patched Hive and AWS Glue Hive-Spark client jars
 COPY --from=build /root/.m2/repository/org/apache/hive/hive-exec/2.3.10-SNAPSHOT/hive-exec-2.3.10-SNAPSHOT.jar ./
 COPY --from=build /root/.m2/repository/org/apache/hive/hive-common/2.3.10-SNAPSHOT/hive-common-2.3.10-SNAPSHOT.jar ./
 COPY --from=build /root/.m2/repository/org/apache/hive/hive-metastore/2.3.10-SNAPSHOT/hive-metastore-2.3.10-SNAPSHOT.jar ./
 COPY --from=build /src/aws-glue-data-catalog-client-for-apache-hive-metastore/aws-glue-datacatalog-spark-client/target/aws-glue-datacatalog-spark-client-3.4.0-SNAPSHOT.jar ./
 
-USER spark
-ENV PATH=$PATH:$SPARK_HOME/bin
+RUN $SPARK_HOME/bin/spark-submit --master local[1] \
+  --class org.apache.spark.examples.SparkPi \
+  --packages $SPARK_PACKAGES  \
+  $SPARK_HOME/examples/jars/spark-examples_*.jar 4
+RUN cp -f /home/spark/.ivy2/jars/*.jar $SPARK_HOME/jars/
+
+ENV PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 ENV PYSPARK_PYTHON=python${PYTHON_VERSION}
 WORKDIR $SPARK_HOME
