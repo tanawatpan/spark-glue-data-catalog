@@ -46,11 +46,15 @@ RUN git add . \
  && wget https://issues.apache.org/jira/secure/attachment/12958418/HIVE-12679.branch-2.3.patch \
  && patch -p0 <HIVE-12679.branch-2.3.patch
 
-# Shade commons-lang3
+# Shade commons-lang3, apache-parquet
 RUN cat <<EOF > shade
 <relocation>
     <pattern>org.apache.commons.lang3</pattern>
-    <shadedPattern>org.apache.hive.commons.lang3</shadedPattern>
+    <shadedPattern>shaded.org.apache.commons.lang3</shadedPattern>
+</relocation>
+<relocation>
+    <pattern>org.apache.parquet</pattern>
+    <shadedPattern>shaded.org.apache.parquet</shadedPattern>
 </relocation>
 EOF
 RUN sed -i "933 r shade" ql/pom.xml
