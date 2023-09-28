@@ -9,9 +9,9 @@ ARG SPARK_VERSION
 ARG SCALA_VERSION
 
 # Install required packages
-RUN apt-get -y update \
- && apt-get -y install -y wget git patch \
- && apt-get -y clean
+RUN apt -y update \
+ && apt -y install -y wget git patch \
+ && apt -y clean
 
 # Build patched Hive for Hive client
 WORKDIR /src
@@ -24,7 +24,7 @@ RUN git checkout branch-3.1 \
  && git apply -3 branch_3.1.patch
 
 # Exclude pentaho-aggdesigner and pentaho-aggdesigner-algorithm
-RUN cat <<EOF > exclude.txt
+RUN cat <<EOF > exclude
 <exclusions>
     <exclusion>
         <groupId>org.pentaho</groupId>
@@ -36,7 +36,7 @@ RUN cat <<EOF > exclude.txt
     </exclusion>
 </exclusions>
 EOF
-RUN sed -i "82 r exclude.txt" upgrade-acid/pom.xml
+RUN sed -i "82 r exclude" upgrade-acid/pom.xml
 
 RUN mvn clean install -DskipTests
 
@@ -44,8 +44,18 @@ RUN git add . \
  && git reset --hard \
  && git checkout branch-2.3 \
  && wget https://issues.apache.org/jira/secure/attachment/12958418/HIVE-12679.branch-2.3.patch \
- && patch -p0 <HIVE-12679.branch-2.3.patch \
- && mvn clean install -DskipTests
+ && patch -p0 <HIVE-12679.branch-2.3.patch
+
+# Shade commons-lang3
+RUN cat <<EOF > shade
+<relocation>
+    <pattern>org.apache.commons.lang3</pattern>
+    <shadedPattern>org.apache.hive.commons.lang3</shadedPattern>
+</relocation>
+EOF
+RUN sed -i "933 r shade" ql/pom.xml
+
+RUN mvn clean install -DskipTests
 
 # Build AWS Glue Hive-Spark client
 WORKDIR /src
