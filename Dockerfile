@@ -1,10 +1,11 @@
-ARG SPARK_VERSION=3.4.1
+ARG SPARK_VERSION=3.5.0
 ARG PYTHON_VERSION=3.11
 ARG SCALA_VERSION=2.12
-ARG SPARK_PACKAGES="org.apache.spark:spark-hadoop-cloud_${SCALA_VERSION}:${SPARK_VERSION},io.delta:delta-core_${SCALA_VERSION}:2.4.0,org.apache.spark:spark-connect_${SCALA_VERSION}:${SPARK_VERSION}"
+ARG DELTA_VERSION=3.0.0
+ARG SPARK_PACKAGES="org.apache.spark:spark-hadoop-cloud_${SCALA_VERSION}:${SPARK_VERSION},io.delta:delta-spark_${SCALA_VERSION}:${DELTA_VERSION},org.apache.spark:spark-connect_${SCALA_VERSION}:${SPARK_VERSION}"
 ARG PYTHON_PACKAGES="findspark regex pyarrow numpy scipy pandas nltk scikit-learn transformers"
 
-FROM maven:3.6.3-openjdk-8 AS build
+FROM maven:3.9.6-eclipse-temurin-8 AS build
 ARG SPARK_VERSION
 ARG SCALA_VERSION
 
