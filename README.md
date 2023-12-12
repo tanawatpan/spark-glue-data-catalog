@@ -48,8 +48,7 @@ This repository contains a Docker image for Spark with AWS Glue Data Catalog con
 2. Start Spark shell with Delta Lake and AWS Glue Data Catalog configurations:
 
     ```bash
-    spark-shell --packages 'org.apache.hadoop:hadoop-aws:3.3.4,io.delta:delta-core_2.12:2.4.0' \
-      --conf "spark.hadoop.hive.imetastoreclient.factory.class=com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory" \
+    spark-shell --conf "spark.hadoop.hive.imetastoreclient.factory.class=com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory" \
       --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
       --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
       --conf "spark.sql.catalogImplementation=hive" \

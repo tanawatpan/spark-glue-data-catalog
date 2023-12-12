@@ -24,7 +24,7 @@ RUN git checkout branch-3.1 \
  && wget https://raw.githubusercontent.com/awslabs/aws-glue-data-catalog-client-for-apache-hive-metastore/branch-3.4.0/branch_3.1.patch \
  && git apply -3 branch_3.1.patch
 
-# Exclude pentaho-aggdesigner and pentaho-aggdesigner-algorithm
+# Exclude pentaho-aggdesigner, pentaho-aggdesigner-algorithm and ldap-client-api
 RUN cat <<EOF > exclude
 <exclusions>
     <exclusion>
@@ -35,9 +35,14 @@ RUN cat <<EOF > exclude
         <groupId>org.pentaho</groupId>
         <artifactId>pentaho-aggdesigner-algorithm</artifactId>
     </exclusion>
+    <exclusion>
+        <groupId>org.apache.directory.client.ldap</groupId>
+        <artifactId>ldap-client-api</artifactId>
+    </exclusion>
 </exclusions>
 EOF
-RUN sed -i "82 r exclude" upgrade-acid/pom.xml
+RUN sed -i "82  r exclude" upgrade-acid/pom.xml
+RUN sed -i "305 r exclude" service/pom.xml
 
 RUN mvn clean install -DskipTests
 
@@ -109,7 +114,7 @@ RUN $SPARK_HOME/bin/spark-submit --master local[1] \
   --class org.apache.spark.examples.SparkPi \
   --packages $SPARK_PACKAGES  \
   $SPARK_HOME/examples/jars/spark-examples_*.jar 4
-RUN cp -f /home/spark/.ivy2/jars/*.jar $SPARK_HOME/jars/
+RUN ln -s /home/spark/.ivy2/jars/*.jar $SPARK_HOME/jars/
 
 ENV PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 ENV PYSPARK_PYTHON=python${PYTHON_VERSION}
