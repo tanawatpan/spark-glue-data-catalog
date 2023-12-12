@@ -2,7 +2,38 @@ Spark Glue Data Catalog Docker Image
 -----------------
 This repository contains a Docker image for Spark with AWS Glue Data Catalog configurations. The image is based on the official Apache Spark Docker image.
 
-## Example
+## Build Image
+
+1. Clone the repository:
+
+    ```bash
+    git clone https://github.com/tanawatpan/spark-glue-data-catalog.git
+    cd <repository_directory>
+    ```
+
+2. Set up build arguments via environment variables:
+
+    ```bash
+    export SPARK_VERSION=3.5.0
+    export DELTA_VERSION=3.0.0
+    export SCALA_VERSION=2.12
+    export PYTHON_VERSION=3.11
+    export PYTHON_PACKAGES="findspark regex pyarrow numpy scipy pandas nltk scikit-learn transformers"
+    ```
+
+3. Build the Docker image:
+
+    ```bash
+    docker build --platform linux/amd64 \
+      --build-arg SPARK_VERSION \
+      --build-arg DELTA_VERSION \
+      --build-arg SCALA_VERSION \
+      --build-arg PYTHON_VERSION \
+      --build-arg PYTHON_PACKAGES \
+      -t spark:${SPARK_VERSION} .
+    ```
+
+## Example Usage
 
 1. Set AWS credentials and region:
 
