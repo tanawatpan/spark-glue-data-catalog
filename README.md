@@ -8,7 +8,7 @@ This repository contains a Docker image for Spark with AWS Glue Data Catalog con
 
     ```bash
     git clone https://github.com/tanawatpan/spark-glue-data-catalog.git
-    cd <repository_directory>
+    cd spark-glue-data-catalog
     ```
 
 2. Set up build arguments via environment variables:
