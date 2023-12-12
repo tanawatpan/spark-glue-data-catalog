@@ -1,5 +1,5 @@
 ARG SPARK_VERSION=3.5.0
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.12
 ARG SCALA_VERSION=2.12
 ARG DELTA_VERSION=3.0.0
 ARG SPARK_PACKAGES="org.apache.spark:spark-hadoop-cloud_${SCALA_VERSION}:${SPARK_VERSION},io.delta:delta-spark_${SCALA_VERSION}:${DELTA_VERSION},org.apache.spark:spark-connect_${SCALA_VERSION}:${SPARK_VERSION}"
@@ -74,7 +74,7 @@ WORKDIR /src/aws-glue-data-catalog-client-for-apache-hive-metastore
 RUN mvn clean package -DskipTests
 
 # Build Spark
-FROM apache/spark:${SPARK_VERSION}-scala${SCALA_VERSION}-java11-ubuntu
+FROM docker.io/spark:${SPARK_VERSION}-scala${SCALA_VERSION}-java17-ubuntu
 ARG SPARK_PACKAGES
 ARG PYTHON_VERSION
 ARG PYTHON_PACKAGES
